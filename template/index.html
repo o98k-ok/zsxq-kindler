@@ -1,0 +1,23 @@
+<style>
+    .table {
+        list-style-type: square;
+    }
+
+    .time {
+        font-size: 10px;
+    }
+</style>
+
+<header style="text-align:center">知识星球-Kindle</header>
+
+<div>
+<ul class="table">{{range .Topics}}
+    <div>
+        <li>
+            <a class="time">{{.Time}}<br></a>
+            <a href="{{.Href}}">{{.Abstract}}</a>
+        </li>
+    </div>
+{{end}}
+</ul>
+</div>
