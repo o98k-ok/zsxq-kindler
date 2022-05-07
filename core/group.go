@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/o98k-ok/lazy/v2/assert"
 	hp "github.com/o98k-ok/pcurl/http"
 	"jaytaylor.com/html2text"
 	"net/http"
@@ -15,16 +16,16 @@ type Group struct {
 	scope   string
 	url     string
 	cli     *http.Client
-	cookie  string
+	token   string
 }
 
-func NewGroup(groupId uint64, cookie string) *Group {
+func NewGroup(groupId uint64, token string) *Group {
 	return &Group{
 		groupId: groupId,
 		scope:   "by_owner",
 		url:     fmt.Sprintf("https://api.zsxq.com/v2/groups/%d/topics", groupId),
 		cli:     DefaultClient,
-		cookie:  cookie,
+		token:   token,
 	}
 }
 
@@ -46,14 +47,19 @@ type TopicStruct struct {
 	} `json:"talk"`
 }
 
+func (g *Group) constructCookie() string {
+	return "zsxq_access_token=" + g.token + ";"
+}
+
 func (g *Group) ListTopics(option Option) ([]Topic, error) {
 	res := make([]Topic, 0, option.Count)
 
-	r := hp.NewRequest(g.cli, g.url).AddParam("scope", g.scope).AddParam("count", strconv.Itoa(option.Count)).AddHeader("cookie", g.cookie)
+	r := hp.NewRequest(g.cli, g.url).AddParam("scope", g.scope).AddParam("count", strconv.Itoa(option.Count)).AddHeader("cookie", g.constructCookie())
 	r.AddHeader("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36")
 	r.AddHeader("accept", " application/json, text/plain, */*")
 
 	resp, err := r.Do()
+	err = assert.IfNoError(err).ElIfEqual(http.StatusOK, resp.Code).Unwrap()
 	if err != nil {
 		return res, err
 	}
@@ -62,8 +68,11 @@ func (g *Group) ListTopics(option Option) ([]Topic, error) {
 		RespData struct {
 			Topics []TopicStruct `json:"topics"`
 		} `json:"resp_data"`
+		Code int `json:"code"`
 	}
+
 	err = json.NewDecoder(resp.Body).Decode(&body)
+	err = assert.IfNoError(err).ElIfEqual(0, body.Code).Unwrap()
 	if err != nil {
 		return res, err
 	}
@@ -82,7 +91,8 @@ func (g *Group) ListTopics(option Option) ([]Topic, error) {
 }
 
 func (g *Group) Fetch(topicId string) (string, error) {
-	resp, err := hp.NewRequest(g.cli, "https://api.zsxq.com/v2/topics/"+topicId).AddHeader("cookie", g.cookie).Do()
+	resp, err := hp.NewRequest(g.cli, "https://api.zsxq.com/v2/topics/"+topicId).AddHeader("cookie", g.constructCookie()).Do()
+	err = assert.IfNoError(err).ElIfEqual(http.StatusOK, resp.Code).Unwrap()
 	if err != nil {
 		return "", err
 	}
@@ -91,8 +101,10 @@ func (g *Group) Fetch(topicId string) (string, error) {
 		RespData struct {
 			Topic TopicStruct `json:"topic"`
 		} `json:"resp_data"`
+		Code int `json:"code"`
 	}
 	err = json.NewDecoder(resp.Body).Decode(&body)
+	err = assert.IfNoError(err).ElIfEqual(0, body.Code).Unwrap()
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +113,7 @@ func (g *Group) Fetch(topicId string) (string, error) {
 		return url.QueryUnescape(body.RespData.Topic.Talk.Text)
 	}
 
-	resp, err = hp.NewRequest(g.cli, body.RespData.Topic.Talk.Article.ArticleURL).AddHeader("cookie", g.cookie).Do()
+	resp, err = hp.NewRequest(g.cli, body.RespData.Topic.Talk.Article.ArticleURL).AddHeader("cookie", g.constructCookie()).Do()
 	if err != nil {
 		return "", err
 	}

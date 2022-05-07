@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	sv := srv.NewXQ()
+	sv := srv.NewPlanet()
 	if sv == nil {
 		return
 	}
