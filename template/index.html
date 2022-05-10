@@ -3,7 +3,7 @@
         list-style-type: square;
     }
 
-    .time {
+    .block {
         font-size: 10px;
     }
 </style>
@@ -14,7 +14,7 @@
 <ul class="table">{{range .Topics}}
     <div>
         <li>
-            <a class="time">{{.Time}}<br></a>
+            <a class="block">{{.Block}}<br></a>
             <a href="{{.Href}}">{{.Abstract}}</a>
         </li>
     </div>

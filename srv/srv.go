@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Planet struct {
@@ -16,9 +17,47 @@ type Planet struct {
 	conf  map[string]string
 }
 
-func (p *Planet) ListTopics(writer http.ResponseWriter, request *http.Request) {
+func (p *Planet) ListMenus(writer http.ResponseWriter, request *http.Request) {
 	tmpl := template.Must(template.ParseFiles("template/index.html"))
+
+	menus, err := p.group.ListMenus()
+	if err != nil {
+		fmt.Println(err)
+		writer.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(writer, "got error %s", err.Error())
+		return
+	}
+
+	type htmlVar struct {
+		Abstract string
+		Href     string
+		Block    string
+	}
+
+	var ss []htmlVar
+	for i, t := range menus {
+		ss = append(ss, struct {
+			Abstract string
+			Href     string
+			Block    string
+		}{Abstract: t.Name(), Href: t.Link(), Block: strconv.Itoa(i)})
+	}
+
+	tmpl.Execute(writer, struct {
+		Topics []htmlVar
+	}{ss})
+}
+
+func (p *Planet) ListTopics(writer http.ResponseWriter, request *http.Request) {
 	option := core.Option{}
+	if strings.Contains(request.URL.Path, "preset") {
+		option.Preset = true
+		option.Tag = request.URL.Path[len("/menus/preset/"):]
+	} else {
+		option.Tag = request.URL.Path[len("/menus/custom/"):]
+	}
+
+	tmpl := template.Must(template.ParseFiles("template/index.html"))
 
 	var err error
 	option.Count, err = strconv.Atoi(p.conf["count"])
@@ -40,7 +79,7 @@ func (p *Planet) ListTopics(writer http.ResponseWriter, request *http.Request) {
 	type htmlVar struct {
 		Abstract string
 		Href     string
-		Time     string
+		Block    string
 	}
 
 	var ss []htmlVar
@@ -48,8 +87,8 @@ func (p *Planet) ListTopics(writer http.ResponseWriter, request *http.Request) {
 		ss = append(ss, struct {
 			Abstract string
 			Href     string
-			Time     string
-		}{Abstract: t.Abstract(), Href: t.Href(), Time: t.CTime()})
+			Block    string
+		}{Abstract: t.Abstract(), Href: t.Href(), Block: t.CTime()})
 	}
 
 	tmpl.Execute(writer, struct {
@@ -72,7 +111,8 @@ func NewPlanet() *Planet {
 	xq := &Planet{}
 	xq.ServeMux = http.NewServeMux()
 
-	xq.ServeMux.HandleFunc("/", xq.ListTopics)
+	xq.ServeMux.HandleFunc("/", xq.ListMenus)
+	xq.ServeMux.HandleFunc("/menus/", xq.ListTopics)
 	xq.ServeMux.HandleFunc("/topics/", xq.TopicDetail)
 
 	f, err := os.Open("./conf/config.json")
