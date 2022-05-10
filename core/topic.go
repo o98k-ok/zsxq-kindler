@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"jaytaylor.com/html2text"
 	"net/http"
 	"net/url"
 )
@@ -23,7 +24,8 @@ func (t *Topic) Abstract() string {
 	}
 
 	// chinese format
-	chn := []rune(content)
+	c, _ := html2text.FromString(content, html2text.Options{PrettyTables: true})
+	chn := []rune(c)
 	size := 48
 	if len(chn) <= size {
 		size = len(chn)
